@@ -1,0 +1,5 @@
+{
+  "name": "FlowCommand Logistics",
+  "description": "A mobile-first, dark-mode traffic management system for warehouse logistics. Features real-time dock management, truck tracking, and AI-driven bottleneck prediction.",
+  "requestFramePermissions": []
+}

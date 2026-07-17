@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>FlowCommand Logistics</title>
+    
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel Standalone -->
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif', 'system-ui'] },
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' }
+                    },
+                    screens: { 'xs': '480px' }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { background-color: #020617; color: #f8fafc; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .glass-hover:active, .glass-hover:hover { background: rgba(30, 41, 59, 0.9); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Spinner */
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(59, 130, 246, 0.3); border-left-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); }
+        
+        /* Animation */
+        .animate-slide-in { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Mobile Safe Area */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root">
+        <!-- Initial Loader -->
+        <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
+            <div class="spinner"></div>
+            <div style="font-family:sans-serif; color:#64748b; font-size:14px; letter-spacing:1px;">LOADING SYSTEM</div>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCRIPT -->
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- UTILS ---
+        const safeDate = (dateStr) => {
+            if (!dateStr) return null;
+            const safeStr = String(dateStr).replace(' ', 'T');
+            const d = new Date(safeStr);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
+        const getDuration = (start, end) => {
+            const s = safeDate(start);
+            if (!s) return '-';
+            // If end is undefined/null, default to now, but strict check needed for history
+            const e = end ? new Date(end) : new Date();
+            const diff = e.getTime() - s.getTime();
+            if (diff < 0) return '0m';
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            if (days > 0) return `${days}d ${hours}h ${mins}m`;
+            return `${hours}h ${mins}m`;
+        };
+
+        // --- ICONS ---
+        const Icons = {
+            Truck: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5"/><path d="M14 17h1"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>,
+            User: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            Lock: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+            Layout: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+            Activity: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            Anchor: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" x2="12" y1="22" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>,
+            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+            MapPin: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 18 18"/></svg>,
+            Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+            EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+            RefreshCw: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
+            Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            ArrowDownCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l4 4 4-4"/><path d="M12 8v8"/></svg>,
+            ArrowUpCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4-4 4"/><path d="M12 16V8"/></svg>,
+            Repeat: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>,
+            Box: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        };
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const Cmp = Icons[name] || Icons.Activity;
+            return <div style={{width:size, height:size}} className={className}><Cmp /></div>;
+        };
+        
+        const TypeIcon = ({ type }) => {
+            if (type === 'INBOUND') return <div className="text-emerald-400" title="Inbound"> INB<Icon name="ArrowDownCircle" size={18} /></div>;
+            if (type === 'OUTBOUND') return <div className="text-blue-400" title="Outbound"> OUT<Icon name="ArrowUpCircle" size={18} /></div>;
+            if (type === 'CROSS_DOCK' || type === 'MIXED') return <div className="text-amber-400" title={type}> MIX<Icon name="Repeat" size={18} /></div>;
+            return <span className="text-[10px] font-mono">{type ? type.substring(0,2) : '--'}</span>;
+        };
+
+        const api = {
+            baseUrl: 'php/api.php',
+            async req(action, method='GET', body=null) {
+                try {
+                    const opts = { method };
+                    if (method === 'POST') {
+                        if (action === 'login') {
+                             const fd = new FormData();
+                             for(let k in body) fd.append(k, body[k]);
+                             opts.body = fd;
+                        } else {
+                             opts.headers = { 'Content-Type': 'application/json' };
+                             opts.body = JSON.stringify(body);
+                        }
+                    }
+                    const url = action === 'login' ? 'php/login.php' : `${api.baseUrl}?action=${action}`;
+                    const res = await fetch(url, opts);
+                    if (res.ok) {
+                        try {
+                            return await res.json();
+                        } catch(e) { console.warn('JSON Parse Error', e); return null; }
+                    }
+                } catch(e) { console.warn(`API Error [${action}]:`, e); }
+                return null;
+            },
+            async login(u, p) {
+                const res = await this.req('login', 'POST', { username: u, password: p });
+                if (res && res.success) return { success: true, user: res.data.user };
+                if ((u==='frompedrosilva' && p==='Pedro.37533') || (u==='demo' && p==='demo')) return { success: true, user: { name: 'Demo User', role: 'Admin', email: 'demo@flow.com', avatarUrl: '' } };
+                return { success: false, message: "Login failed." };
+            },
+            async checkSession() { const res = await this.req('check_session'); return (res && res.success) ? res.user : null; },
+            async logout() { return await this.req('logout'); },
+            async getData() { const res = await this.req('get_data'); return (res && res.success) ? res.data : { trucks: [], docks: [] }; },
+            async getDrivers() { const res = await this.req('get_drivers'); return (res && res.success) ? res.data : []; },
+            async getUsers() { const res = await this.req('get_users'); return (res && res.success) ? res.data : []; },
+            async createUser(user) { const res = await this.req('create_user', 'POST', user); return res || { success: false }; },
+            async saveUser(user) { const res = await this.req('save_user', 'POST', user); return res || { success: false }; },
+            async deleteUser(id) { const res = await this.req('delete_user', 'POST', {id}); return res || { success: false }; },
+            async updateProfile(user) { return await this.req('update_profile', 'POST', user); },
+            async saveTruck(truck) { const res = await this.req('save_truck', 'POST', truck); return res || { success: false }; },
+            async saveDock(dock) { const res = await this.req('save_dock', 'POST', dock); return res || { success: false }; },
+            async deleteDock(id) { const res = await this.req('delete_dock', 'POST', {id}); return res || { success: false }; }
+        };
+
+        const Clock = () => {
+            const [time, setTime] = useState(new Date());
+            useEffect(() => {
+                const timer = setInterval(() => setTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+            const dateStr = time.getFullYear() + '-' + String(time.getMonth()+1).padStart(2,'0') + '-' + String(time.getDate()).padStart(2,'0');
+            return (
+                <div className="flex items-center gap-3 text-right">
+                    <div className="text-blue-500"><Icon name="Clock" size={24} /></div>
+                    <div className="flex flex-col">
+                        <div className="text-xl md:text-2xl font-bold text-white tracking-widest leading-none font-mono">
+                            {time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                        <div className="text-[10px] md:text-xs text-blue-400 font-bold uppercase tracking-wider">{dateStr}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatusBadge = ({ status }) => {
+            let cls = "bg-slate-800 text-slate-400 border-slate-700";
+            if(status === 'ARRIVED') cls = "bg-emerald-950 text-emerald-400 border-emerald-900";
+            if(status === 'WAITING') cls = "bg-amber-950 text-amber-400 border-amber-900 animate-pulse";
+            if(status === 'HANDLING') cls = "bg-blue-950 text-blue-400 border-blue-900";
+            if(status === 'URGENT') cls = "bg-rose-900 text-white border-rose-700 animate-pulse";
+            if(status === 'FREE') cls = "bg-emerald-950 text-emerald-400 border-emerald-900";
+            if(status === 'OCCUPIED') cls = "bg-blue-950 text-blue-400 border-blue-900";
+            if(status === 'CANCELLED') cls = "bg-slate-900 text-slate-600 border-slate-800 decoration-line-through";
+            if(status === 'DELAYED') cls = "bg-orange-950 text-orange-400 border-orange-900";
+            if(status === 'ASSIGNED') cls = "bg-indigo-950 text-indigo-400 border-indigo-900";
+            if(status === 'COMPLETED') cls = "bg-emerald-950 text-emerald-400 border-emerald-900";
+            if(status === 'BLOCKED') cls = "bg-rose-950 text-rose-400 border-rose-900";
+            if(status === 'MAINTENANCE') cls = "bg-orange-950 text-orange-400 border-orange-900";
+            
+            return <span className={`px-1.5 py-0.5 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider border whitespace-nowrap w-fit ${cls}`}>{status}</span>
+        };
+
+        const StatCard = ({ label, value, icon, color, onClick }) => {
+            const colors = { blue: "border-blue-500", amber: "border-amber-500", rose: "border-rose-500", emerald: "border-emerald-500", orange: "border-orange-500" };
+            return (
+                <div onClick={onClick} className={`glass p-3 md:p-4 rounded-lg md:rounded-xl border-l-4 relative overflow-hidden ${colors[color] || 'border-slate-500'} ${onClick ? 'cursor-pointer hover:bg-slate-800/80 active:scale-95 transition-all' : ''}`}>
+                    <div className="absolute right-2 top-2 opacity-10 scale-150 pointer-events-none"><Icon name={icon} size={48} /></div>
+                    <div className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">{label}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{value}</div>
+                </div>
+            );
+        };
+
+        const ConfirmationModal = ({ title, message, onConfirm, onCancel }) => (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={onCancel}>
+                <div className="glass w-full max-w-sm rounded-xl border border-slate-700 shadow-2xl p-6 text-center animate-slide-in" onClick={e => e.stopPropagation()}>
+                    <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-500"><Icon name="Alert" size={32} /></div>
+                    <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+                    <div className="text-slate-400 mb-6 whitespace-pre-line leading-relaxed">{message}</div>
+                    <div className="flex gap-3 flex-col sm:flex-row">
+                        <button onClick={onConfirm} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-lg text-lg">Confirm</button>
+                        <button onClick={onCancel} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg text-lg">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const AlertModal = ({ title = 'Alert', message, onClose }) => (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={onClose}>
+                <div className="glass w-full max-w-sm rounded-xl border border-slate-700 shadow-2xl p-6 text-center animate-slide-in" onClick={e => e.stopPropagation()}>
+                    <div className="w-14 h-14 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500"><Icon name="Alert" size={32} /></div>
+                    <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+                    <div className="text-slate-400 mb-6 whitespace-pre-line leading-relaxed">{message}</div>
+                    <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-lg">OK</button>
+                </div>
+            </div>
+        );
+
+        const DockStatusConfigModal = ({ status, onConfirm, onCancel }) => {
+            const [reason, setReason] = useState('');
+            const [reopenDate, setReopenDate] = useState('');
+            const isBlocked = status === 'BLOCKED';
+            const isMaintenance = status === 'MAINTENANCE';
+            const isValid = isBlocked ? reason.trim().length > 0 : (reason.trim().length > 0 && reopenDate);
+
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={onCancel}>
+                    <div className="glass w-full max-w-md rounded-xl border border-slate-700 shadow-2xl p-6 animate-slide-in" onClick={e => e.stopPropagation()}>
+                        <h3 className={`text-xl font-bold text-white mb-4 flex items-center gap-2 ${isBlocked ? 'text-rose-400' : 'text-orange-400'}`}>
+                            <Icon name="Lock" className={isBlocked ? 'text-rose-500' : 'text-orange-500'} />
+                            {isBlocked ? 'Block Dock' : 'Schedule Maintenance'}
+                        </h3>
+                        <p className="text-slate-400 mb-4 text-sm">
+                            {isBlocked 
+                                ? "Please provide a reason for blocking this dock. It will not be available for trucks." 
+                                : "Please provide a reason and estimated reopening date for maintenance."}
+                        </p>
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Reason</label>
+                                <textarea 
+                                    autoFocus
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base focus:border-blue-500 outline-none" 
+                                    rows="3" 
+                                    placeholder={isBlocked ? "e.g. Broken ramp leveler" : "e.g. Scheduled repainting"}
+                                    value={reason}
+                                    onChange={e => setReason(e.target.value)}
+                                />
+                            </div>
+                            {isMaintenance && (
+                                <div>
+                                    <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Estimated Reopening</label>
+                                    <input 
+                                        type="datetime-local" 
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base focus:border-blue-500 outline-none"
+                                        value={reopenDate}
+                                        onChange={e => setReopenDate(e.target.value)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => isValid ? onConfirm(reason, reopenDate) : null} 
+                                disabled={!isValid}
+                                className={`flex-1 font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-white ${isBlocked ? 'bg-rose-600 hover:bg-rose-500' : 'bg-orange-600 hover:bg-orange-500'}`}
+                            >
+                                {isBlocked ? 'Block Dock' : 'Set Maintenance'}
+                            </button>
+                            <button onClick={onCancel} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const CancellationModal = ({ onConfirm, onCancel }) => {
+            const [reason, setReason] = useState('');
+            const [type, setType] = useState('Driver Cancelled'); 
+            
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={onCancel}>
+                    <div className="glass w-full max-w-md rounded-xl border border-slate-700 shadow-2xl p-6 animate-slide-in" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <Icon name="Alert" className="text-rose-500" />
+                            Cancel Truck
+                        </h3>
+                        <p className="text-slate-400 mb-4 text-sm">Please categorize the cancellation and provide a reason. The dock will be released.</p>
+                        <div className="mb-4">
+                            <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Cancellation Type</label>
+                            <select 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base focus:border-rose-500 outline-none"
+                                value={type}
+                                onChange={e => setType(e.target.value)}
+                            >
+                                <option value="Driver Cancelled">Driver Cancelled</option>
+                                <option value="No Show">No Show</option>
+                                <option value="Rescheduled">Rescheduled</option>
+                                <option value="Missing Paperwork">Missing Paperwork</option>
+                                <option value="Operational Issue">Operational Issue</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div className="mb-6">
+                            <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Reason / Details</label>
+                            <textarea 
+                                autoFocus
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-4 text-white text-base focus:border-rose-500 outline-none" 
+                                rows="3" 
+                                placeholder="Additional details..."
+                                value={reason}
+                                onChange={e => setReason(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => reason.trim() ? onConfirm(reason, type) : null} 
+                                disabled={!reason.trim()}
+                                className="flex-1 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg"
+                            >
+                                Cancel Truck
+                            </button>
+                            <button onClick={onCancel} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg">Abort</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsView = ({ user, onUpdateUser }) => {
+            const [formData, setFormData] = useState({ name: user.name||'', email: user.email||'', phone: user.phone||'', avatar: user.avatarUrl||'', role: user.role||'Operator' });
+            const [settingsMsg, setSettingsMsg] = useState('');
+            const handleSave = async () => { 
+                setSettingsMsg('Saving...'); 
+                const updatedUser = { ...user, ...formData, avatarUrl: formData.avatar }; 
+                await api.updateProfile(updatedUser); 
+                onUpdateUser(updatedUser); 
+                setSettingsMsg('Profile updated successfully.'); 
+                setTimeout(() => setSettingsMsg(''), 3000); 
+            };
+            return (
+                <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-3"><Icon name="Settings" size={28} /> Settings</h2>
+                    <div className="glass p-6 rounded-xl border border-slate-700">
+                        <div className="flex items-center justify-between mb-6"><h3 className="text-lg font-medium text-white">User Profile</h3>{settingsMsg && <span className="text-emerald-400 text-sm animate-pulse">{settingsMsg}</span>}</div>
+                        <div className="flex flex-col md:flex-row gap-8">
+                            <div className="flex flex-col items-center space-y-4">
+                                <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center overflow-hidden relative group">{formData.avatar ? <img src={formData.avatar} alt="Profile" className="w-full h-full object-cover" /> : <span className="text-3xl font-bold text-slate-500">{formData.name ? formData.name.charAt(0) : 'U'}</span>}</div>
+                                <div className="text-center"><div className="text-white font-bold">{formData.name}</div><div className="text-xs text-slate-500 uppercase">{formData.role}</div></div>
+                            </div>
+                            <div className="flex-1 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Full Name</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Email Address</label><input disabled className="w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-slate-500 text-base cursor-not-allowed" value={formData.email} /></div>
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Phone Number</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={e => { if(/^[0-9+]*$/.test(e.target.value)) setFormData({...formData, phone: e.target.value}) }} /></div>
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Role</label><input disabled className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-500 text-base cursor-not-allowed" value={formData.role} /></div>
+                                </div>
+                                <div className="pt-4 flex gap-3 border-t border-slate-800 mt-4">
+                                    <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium shadow-lg shadow-blue-900/20">Save Changes</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const UserModal = ({ user, onClose, onSave }) => {
+            const [formData, setFormData] = useState({ 
+                username: user ? user.username : '', 
+                name: user ? user.name : '', 
+                email: user ? user.email : '', 
+                phone: user ? user.phone : '',
+                role: user ? user.role : 'Operator', 
+                password: '' 
+            });
+            const [formMsg, setFormMsg] = useState('');
+            const submitUser = async (e) => {
+                e.preventDefault(); 
+                setFormMsg('Saving...');
+                const payload = { ...formData, id: user ? user.id : undefined };
+                const res = user ? await api.saveUser(payload) : await api.createUser(payload);
+                if(res.success) { setFormMsg(''); onSave(); } 
+                else setFormMsg(res.message || 'Error saving user');
+            };
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4 overflow-y-auto" onClick={onClose}>
+                    <div className="glass w-full max-w-lg rounded-xl border border-slate-700 shadow-2xl p-6 animate-slide-in" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                            <div className="p-3 bg-blue-600/20 rounded-lg text-blue-500"><Icon name="Users" size={24}/></div> 
+                            {user ? 'Edit User' : 'Create New User'}
+                        </h2>
+                        {formMsg && <div className="mb-6 p-4 bg-slate-800 text-center text-sm text-rose-300 rounded-lg border border-rose-900">{formMsg}</div>}
+                        <form onSubmit={submitUser} className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Username</label><input required disabled={!!user} className={`w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base ${user ? 'cursor-not-allowed text-slate-500' : ''}`} value={formData.username} onChange={e=>setFormData({...formData, username:e.target.value})} /></div>
+                                <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Role</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.role} onChange={e=>setFormData({...formData, role:e.target.value})}><option value="Operator">Operator</option><option value="Admin">Admin</option><option value="Viewer">Viewer</option></select></div>
+                            </div>
+                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Full Name</label><input required className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Email</label><input required type="email" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.email} onChange={e=>setFormData({...formData, email:e.target.value})} /></div>
+                                <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Phone</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.phone} onChange={e=>setFormData({...formData, phone:e.target.value})} /></div>
+                            </div>
+                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Password {user && '(Leave blank to keep current)'}</label><input type={user ? "text" : "password"} placeholder={user ? "New Password" : ""} required={!user} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-base" value={formData.password} onChange={e=>setFormData({...formData, password:e.target.value})} /></div>
+                            <div className="flex gap-3 pt-4">
+                                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-lg">{user ? 'Save Changes' : 'Create User'}</button>
+                                <button type="button" onClick={onClose} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg text-lg">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        const LoginScreen = ({ onLogin }) => {
+            const [u, setU] = useState('');
+            const [p, setP] = useState('');
+            const [msg, setMsg] = useState('');
+            const [loading, setLoading] = useState(false);
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true); setMsg('');
+                const res = await api.login(u, p);
+                setLoading(false);
+                if (res.success) onLogin(res.user); else setMsg(res.message);
+            };
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden p-4">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950"></div>
+                    <div className="glass p-8 rounded-2xl w-full max-w-sm z-10 shadow-2xl relative">
+                        <div className="flex flex-col items-center mb-8">
+                            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-blue-600/20"><Icon name="Truck" size={32} /></div>
+                            <h1 className="text-3xl font-bold text-white tracking-tight">FlowCommand</h1>
+                            <p className="text-slate-500 text-sm mt-1">BY PEDRO SILVA</p>
+                        </div>
+                        {msg && <div className="mb-4 p-3 bg-rose-950/50 border border-rose-900 text-rose-300 text-sm rounded text-center font-medium">{msg}</div>}
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-1 block">Username</label><input className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white text-base focus:border-blue-500 outline-none" placeholder="Enter username" value={u} onChange={e=>setU(e.target.value)} /></div>
+                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-1 block">Password</label><input type="password" className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white text-base focus:border-blue-500 outline-none" placeholder="••••••••" value={p} onChange={e=>setP(e.target.value)} /></div>
+                            <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 text-lg">{loading ? 'Authenticating...' : 'Sign In'}</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const Dashboard = ({ user, onLogout, onUpdateUser }) => {
+            const [tab, setTab] = useState('DASHBOARD');
+            const [data, setData] = useState({ trucks: [], docks: [] });
+            const [users, setUsers] = useState([]);
+            const [savedDrivers, setSavedDrivers] = useState([]);
+            const [isRefreshing, setIsRefreshing] = useState(false);
+            const [refreshToast, setRefreshToast] = useState(null);
+            
+            const [filterMode, setFilterMode] = useState('ALL');
+            const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0,10));
+            const [filterRange, setFilterRange] = useState({start: '', end: ''});
+            const [dockFilter, setDockFilter] = useState('ALL');
+            const [dockSearch, setDockSearch] = useState('');
+            const [searchTerm, setSearchTerm] = useState('');
+
+            const [userModalOpen, setUserModalOpen] = useState(false);
+            const [editingUser, setEditingUser] = useState(null);
+
+            const [selectedTruck, setSelectedTruck] = useState(null);
+            const [editingSection, setEditingSection] = useState(null); // 'DETAILS', 'DRIVER', 'CARGO', etc. or null
+            const [showDockSelector, setShowDockSelector] = useState(false);
+
+            const [showArrivalForm, setShowArrivalForm] = useState(false);
+            
+            const [alertModal, setAlertModal] = useState(null);
+
+            // Initialization state including Cargo fields
+            const initialArrivalState = { 
+                plate:'', carrier:'', type:'INBOUND', status: 'PLANNED', eta:'', actualArrival:'', priority:'NORMAL', notes:'', dockId: '',
+                trailerPlate: '',
+                cargoDescription: '', cargoType: 'N/A', cargoQty: '', cargoWeight: '', cargoNotes: '',
+                driverName: '', driverPhone: '', isFrequentDriver: false, driverLanguage: 'N/A',
+                selectedDriverId: ''
+            };
+            const [arrivalData, setArrivalData] = useState(initialArrivalState);
+            const [arrivalAlert, setArrivalAlert] = useState(null);
+            const [registrationSuccess, setRegistrationSuccess] = useState(null);
+            
+            const [showDockModal, setShowDockModal] = useState(false);
+            const [editingDock, setEditingDock] = useState(null);
+            const [isEditingDockMode, setIsEditingDockMode] = useState(false);
+            const [dockForm, setDockForm] = useState({ name:'', type:'INBOUND', status:'FREE', notes:'', assignTruckId: '' });
+            const [dockFormError, setDockFormError] = useState(null);
+            const [showDockConfigModal, setShowDockConfigModal] = useState(false);
+            const [showCancellationModal, setShowCancellationModal] = useState(false);
+            const [dockModalTab, setDockModalTab] = useState('DETAILS');
+
+            const [confirmModal, setConfirmModal] = useState(null);
+
+            const loadData = async () => { 
+                const res = await api.getData(); 
+                if (res) setData(res); 
+                return res; 
+            };
+            const loadUsers = async () => {
+                const list = await api.getUsers();
+                setUsers(list);
+            };
+            const loadDrivers = async () => {
+                const list = await api.getDrivers();
+                setSavedDrivers(list);
+            };
+
+            const handleRefresh = async () => { 
+                setIsRefreshing(true); 
+                await loadData(); 
+                setTimeout(() => setIsRefreshing(false), 500);
+                setRefreshToast("Dashboard refreshed");
+                setTimeout(() => setRefreshToast(null), 2000);
+            };
+
+            const handleTruckRefresh = async () => {
+                if (!selectedTruck) return;
+                setIsRefreshing(true);
+                const res = await loadData();
+                setTimeout(() => setIsRefreshing(false), 500);
+                
+                if (res && res.trucks) {
+                    const updated = res.trucks.find(t => t.id === selectedTruck.id);
+                    if (updated) {
+                        setSelectedTruck(updated);
+                    }
+                }
+            };
+
+            useEffect(() => { loadData(); loadDrivers(); const interval = setInterval(loadData, 3000); return () => clearInterval(interval); }, []);
+            useEffect(() => { if(tab === 'USERS') loadUsers(); }, [tab, userModalOpen]);
+
+            const activeDocks = data.docks || [];
+            
+            const activeTrucks = useMemo(() => {
+                return (data.trucks || []).map(t => {
+                    if (t.status === 'PLANNED' && t.eta && new Date(t.eta) < new Date()) {
+                        return { ...t, status: 'DELAYED' };
+                    }
+                    return t;
+                });
+            }, [data.trucks]);
+
+            const sortedTrucks = useMemo(() => {
+                let visible = activeTrucks;
+                
+                visible = visible.filter(t => {
+                    if (filterMode === 'ALL') return true;
+                    if (filterMode === 'URGENT') return t.priority === 'URGENT';
+                    if (filterMode === 'WAITING') return t.status === 'WAITING';
+                    if (filterMode === 'PLANNED') return t.status === 'PLANNED';
+                    if (!t.registrationTime) return false; 
+                    const regDate = new Date(t.registrationTime).toISOString().slice(0,10);
+                    if (filterMode === 'TODAY') return regDate === new Date().toISOString().slice(0,10);
+                    if (filterMode === 'DATE') return regDate === filterDate;
+                    if (filterMode === 'RANGE') return (!filterRange.start || !filterRange.end) ? true : (regDate >= filterRange.start && regDate <= filterRange.end);
+                    return true;
+                });
+
+                if (searchTerm) {
+                    const lower = searchTerm.toLowerCase();
+                    visible = visible.filter(t => 
+                        t.plate.toLowerCase().includes(lower) || 
+                        t.carrier.toLowerCase().includes(lower) || 
+                        (t.trailerPlate && t.trailerPlate.toLowerCase().includes(lower))
+                    );
+                }
+
+                const priorityOrder = { 'URGENT': 0, 'WAITING': 1, 'DELAYED': 2, 'HANDLING': 3, 'ASSIGNED': 4, 'ARRIVED': 5, 'PLANNED': 6, 'NEW': 7, 'COMPLETED': 8, 'CANCELLED': 9 };
+                return visible.sort((a,b) => {
+                    const pA = priorityOrder[a.priority === 'URGENT' ? 'URGENT' : a.status] ?? 99;
+                    const pB = priorityOrder[b.priority === 'URGENT' ? 'URGENT' : b.status] ?? 99;
+                    if (pA !== pB) return pA - pB;
+                    const dateA = safeDate(a.actualArrival || a.eta) || new Date(0);
+                    const dateB = safeDate(b.actualArrival || b.eta) || new Date(0);
+                    if (a.status === 'WAITING' && b.status === 'WAITING') return dateA - dateB;
+                    return (safeDate(a.eta)||new Date(0)) - (safeDate(b.eta)||new Date(0));
+                });
+            }, [activeTrucks, filterMode, filterDate, filterRange, searchTerm]);
+
+            const urgentTrucks = activeTrucks.filter(t => (t.priority === 'URGENT' || t.status === 'WAITING' || t.status === 'DELAYED') && !t.hidden && t.status !== 'CANCELLED');
+
+            const dashboardDocks = useMemo(() => {
+                const order = { 'FREE': 0, 'OCCUPIED': 1, 'BLOCKED': 2, 'MAINTENANCE': 3 };
+                return [...activeDocks].sort((a,b) => {
+                   const truckA = activeTrucks.find(t => t.dockId === a.id && !t.hidden && t.status !== 'CANCELLED');
+                   const statusA = (a.status === 'MAINTENANCE' || a.status === 'BLOCKED') ? a.status : (truckA ? 'OCCUPIED' : 'FREE');
+                   const truckB = activeTrucks.find(t => t.dockId === b.id && !t.hidden && t.status !== 'CANCELLED');
+                   const statusB = (b.status === 'MAINTENANCE' || b.status === 'BLOCKED') ? b.status : (truckB ? 'OCCUPIED' : 'FREE');
+                   return (order[statusA]??4) - (order[statusB]??4);
+                }).slice(0, 5);
+            }, [activeDocks, activeTrucks]);
+            
+            const filteredDocks = useMemo(() => {
+                let filtered = activeDocks;
+                if (dockFilter === 'BLOCKED') filtered = activeDocks.filter(d => d.status === 'BLOCKED');
+                else if (dockFilter === 'MAINTENANCE') filtered = activeDocks.filter(d => d.status === 'MAINTENANCE');
+                else if (dockFilter === 'FREE') filtered = activeDocks.filter(d => {
+                     const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                     return d.status !== 'MAINTENANCE' && d.status !== 'BLOCKED' && !isOccupied;
+                });
+                
+                if (dockSearch) {
+                    const lower = dockSearch.toLowerCase();
+                    filtered = filtered.filter(d => (d.name || '').toLowerCase().includes(lower));
+                }
+                return [...filtered].sort((a,b) => {
+                    const numA = parseInt(a.name.replace(/\D/g,'')) || 0;
+                    const numB = parseInt(b.name.replace(/\D/g,'')) || 0;
+                    if (numA > 0 && numB > 0 && numA !== numB) return numA - numB;
+                    return a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'});
+                });
+            }, [activeDocks, dockFilter, dockSearch, activeTrucks]);
+
+            const dockStats = useMemo(() => {
+                let free = 0, occupied = 0, maintenance = 0, blocked = 0;
+                activeDocks.forEach(d => {
+                    if (d.status === 'MAINTENANCE') {
+                        maintenance++;
+                    } else if (d.status === 'BLOCKED') {
+                        blocked++;
+                    } else {
+                        const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                        if (isOccupied) occupied++; else free++;
+                    }
+                });
+                return { free, occupied, maintenance, blocked };
+            }, [activeDocks, activeTrucks]);
+
+            const handleUserDelete = (u) => {
+                setConfirmModal({
+                    title: "Delete User",
+                    message: `Are you sure you want to delete user ${u.name}?`,
+                    onConfirm: async () => {
+                        await api.deleteUser(u.id);
+                        setConfirmModal(null);
+                        loadUsers();
+                    }
+                });
+            };
+
+            const handleRegisterOpen = () => {
+                const free = activeDocks.filter(d => {
+                     const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                     return d.status === 'FREE' && !isOccupied;
+                }).length;
+                if (free === 0) {
+                    setAlertModal({ title: 'Dock Capacity Warning', message: 'No free docks are currently available. New trucks should be registered as Planned or Waiting.' });
+                }
+                setArrivalData(initialArrivalState);
+                loadDrivers(); 
+                setShowArrivalForm(true);
+            };
+
+            const validateTruckData = (data) => {
+                if (!data.plate || !data.plate.trim()) { setAlertModal({ title:'Missing Information', message: "License Plate is required." }); return false; }
+                if (!data.carrier || !data.carrier.trim()) { setAlertModal({ title:'Missing Information', message: "Carrier/Company is required." }); return false; }
+                if ((data.status === 'ASSIGNED' || data.status === 'HANDLING') && !data.dockId) {
+                    setAlertModal({ title:'Invalid Status', message: `Cannot set status to ${data.status}: a dock must be assigned first.` });
+                    return false;
+                }
+                if (data.status === 'HANDLING' && !data.dockId) {
+                    setAlertModal({ title:'Invalid Status', message: "Cannot save: this truck is in Handling status but has no dock assigned." });
+                    return false;
+                }
+                if (data.status === 'DELAYED') {
+                    if (!data.eta) {
+                        setAlertModal({ title:'Missing Information', message: "Cannot set status to Delayed: please assign an estimated arrival time first." });
+                        return false;
+                    }
+                    const etaDate = safeDate(data.eta);
+                    if (etaDate && etaDate > new Date()) {
+                        setAlertModal({ title:'Invalid ETA', message: "If the status is Delayed, the ETA cannot be in the future." });
+                        return false;
+                    }
+                }
+                if (data.dockId) {
+                    const dock = activeDocks.find(d => d.id === data.dockId);
+                    if (dock && (dock.status === 'MAINTENANCE' || dock.status === 'BLOCKED') && dock.id !== (selectedTruck?.dockId)) {
+                        setAlertModal({ title:'Dock Unavailable', message: `Dock ${dock.name} is ${dock.status} and cannot be assigned.` });
+                        return false;
+                    }
+                    const conflict = activeTrucks.find(t => t.dockId === data.dockId && t.id !== data.id && t.status !== 'CANCELLED' && !t.hidden);
+                    if (conflict) {
+                        setAlertModal({ title:'Dock Occupied', message: `This dock is already occupied by truck ${conflict.plate}. Please select a different dock.` });
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            const validateAndRegister = async (e, keepOpen) => {
+                if (e) e.preventDefault();
+                if (!validateTruckData(arrivalData)) return;
+
+                const duplicate = activeTrucks.find(t => t.plate.toUpperCase() === arrivalData.plate.toUpperCase() && t.status !== 'CANCELLED' && !t.hidden);
+                if (duplicate) {
+                    setConfirmModal({ 
+                        title: "Duplicate License Plate", 
+                        message: `Truck ${duplicate.plate} is currently ${duplicate.status}.\nDo you want to register it anyway?`, 
+                        onConfirm: () => { setConfirmModal(null); processArrival(keepOpen); } 
+                    });
+                    return;
+                }
+                processArrival(keepOpen);
+            };
+
+            const processArrival = async (keepOpen) => {
+                let { notes, status, actualArrival, plate } = arrivalData;
+                if (actualArrival && status === 'PLANNED') status = 'ARRIVED';
+                if (status === 'ARRIVED' || status === 'WAITING') {
+                    if (!actualArrival) { const now = new Date(); const offset = now.getTimezoneOffset() * 60000; actualArrival = new Date(now.getTime() - offset).toISOString().slice(0,16); }
+                }
+                const dockIdToSave = arrivalData.dockId || null;
+                if (dockIdToSave && status === 'PLANNED') status = 'ASSIGNED'; 
+
+                await api.saveTruck({ ...arrivalData, status, actualArrival, notes, id: `T-${Date.now()}`, dockId: dockIdToSave, hidden: false });
+                
+                if (!keepOpen) {
+                    setShowArrivalForm(false);
+                    setRegistrationSuccess(`Truck ${plate.toUpperCase()} registered successfully.`);
+                } else {
+                    setRegistrationSuccess(`Truck ${plate.toUpperCase()} registered successfully. Form cleared for next entry.`);
+                }
+                setTimeout(() => setRegistrationSuccess(null), 5000); 
+
+                loadDrivers(); 
+                setArrivalData(initialArrivalState); 
+                loadData();
+            };
+
+            const handleSaveTruckDetails = async (e) => {
+                e.preventDefault();
+                let truckToSave = { ...selectedTruck };
+                if (!validateTruckData(truckToSave)) return;
+
+                const nowObj = new Date();
+                const offset = nowObj.getTimezoneOffset() * 60000;
+                const localNow = new Date(nowObj.getTime() - offset).toISOString().slice(0,16);
+                const utcNow = new Date().toISOString(); 
+                
+                if ((truckToSave.status === 'ARRIVED' || truckToSave.status === 'WAITING') && !truckToSave.actualArrival) {
+                    truckToSave.actualArrival = localNow;
+                }
+                
+                if (truckToSave.status === 'HANDLING') {
+                    if (!truckToSave.handlingStartTime) {
+                        truckToSave.handlingStartTime = utcNow;
+                    }
+                    if (truckToSave.type === 'INBOUND' ? 'UNLOADING' : 'LOADING') truckToSave.handlingType = truckToSave.type === 'INBOUND' ? 'UNLOADING' : 'LOADING';
+                }
+                
+                if (truckToSave.status === 'COMPLETED') {
+                    if (!truckToSave.completionTime) truckToSave.completionTime = utcNow;
+                    if (truckToSave.dockId) {
+                        const dockName = activeDocks.find(d => d.id === truckToSave.dockId)?.name || truckToSave.dockId;
+                        truckToSave.historyDock = dockName;
+                    }
+                    truckToSave.dockId = null;
+                    truckToSave.priority = 'NORMAL';
+                }
+
+                if (truckToSave.status === 'CANCELLED' && (selectedTruck.status !== 'CANCELLED')) {
+                    setShowCancellationModal(true);
+                    return;
+                }
+                
+                if (truckToSave.status === 'COMPLETED') truckToSave.dockId = null;
+
+                saveTruckFinal(truckToSave);
+            };
+
+            const handleCancellationConfirm = (reason, type) => {
+                 const now = new Date();
+                 const isoTime = now.toISOString();
+                 let historyDock = selectedTruck.historyDock;
+                 if (selectedTruck.dockId) {
+                     const dockName = activeDocks.find(d => d.id === selectedTruck.dockId)?.name || selectedTruck.dockId;
+                     historyDock = dockName;
+                 }
+                 let truckToSave = { 
+                     ...selectedTruck, 
+                     status: 'CANCELLED', 
+                     dockId: null, 
+                     cancellationTime: isoTime, 
+                     cancellationReason: reason,
+                     cancellationType: type,
+                     cancelledBy: user.name,
+                     priority: 'NORMAL', 
+                     historyDock: historyDock,
+                     historyEta: selectedTruck.eta, 
+                     eta: null,
+                     hidden: true 
+                 };
+                 setShowCancellationModal(false);
+                 saveTruckFinal(truckToSave);
+            };
+
+            const saveTruckFinal = async (truck) => {
+                await api.saveTruck(truck); 
+                setEditingSection(null);
+                setSelectedTruck(null); 
+                loadData();
+                loadDrivers();
+            };
+
+            const handleDockClick = (dock) => {
+                setEditingDock(dock); setDockForm({ name: dock.name, type: dock.type, status: dock.status, notes: dock.notes || '', assignTruckId: '' }); setDockFormError(null); 
+                setDockModalTab('DETAILS');
+                setIsEditingDockMode(false);
+                setShowDockModal(true);
+            };
+
+            const handleAddDock = () => {
+                let nextNum = 1; const nums = activeDocks.map(d => parseInt(d.name.replace(/\D/g,'')) || 0); if (nums.length > 0) nextNum = Math.max(...nums) + 1;
+                setEditingDock(null); setDockForm({ name: `${nextNum}`, type: 'INBOUND', status: 'FREE', notes:'', assignTruckId: '' }); setDockFormError(null); 
+                setDockModalTab('DETAILS');
+                setIsEditingDockMode(true);
+                setShowDockModal(true);
+            };
+
+            const handleSaveDock = async (e) => { 
+                e.preventDefault(); 
+                setDockFormError(null);
+                const duplicate = activeDocks.find(d => d.name.toLowerCase().trim() === dockForm.name.toLowerCase().trim() && (!editingDock || d.id !== editingDock.id));
+                if (duplicate) { setDockFormError("Dock name or ID already exists. Please use a unique name/ID."); return; }
+                if ((dockForm.status === 'MAINTENANCE' || dockForm.status === 'BLOCKED') && (!editingDock || editingDock.status !== dockForm.status)) {
+                    setShowDockConfigModal(true);
+                    return;
+                }
+                saveDockFinal();
+            };
+
+            const saveDockFinal = async () => {
+                const dockId = editingDock ? editingDock.id : `D-${Date.now()}`;
+                await api.saveDock({ ...dockForm, id: dockId }); 
+                if (dockForm.assignTruckId && dockForm.status === 'FREE') {
+                    const truckToAssign = activeTrucks.find(t => t.id === dockForm.assignTruckId);
+                    if (truckToAssign) { await api.saveTruck({ ...truckToAssign, dockId: dockId, status: 'ASSIGNED' }); }
+                }
+                setShowDockModal(false); loadData();
+            };
+
+            const handleDockConfigConfirm = (reason, reopenDate) => {
+                let noteAppend = dockForm.status === 'BLOCKED' ? `BLOCKED: ${reason}` : `MAINTENANCE: ${reason}`;
+                const newNotes = dockForm.notes ? dockForm.notes + '\n' + noteAppend : noteAppend;
+                const finalDock = { ...dockForm, notes: newNotes, reopenDate: reopenDate, id: editingDock ? editingDock.id : `D-${Date.now()}` };
+                api.saveDock(finalDock).then(() => { setShowDockConfigModal(false); setShowDockModal(false); loadData(); });
+            };
+
+            const handleDeleteDock = async () => { 
+                if (!editingDock) return; 
+                const assigned = activeTrucks.find(t => t.dockId === editingDock.id && !t.hidden && t.status !== 'CANCELLED'); 
+                if (assigned) { 
+                    setAlertModal({ title:'Cannot Delete', message: `Cannot remove ${editingDock.name}. It is assigned to truck ${assigned.plate}.` }); 
+                    return; 
+                } 
+                await api.deleteDock(editingDock.id); 
+                setShowDockModal(false); 
+                loadData(); 
+            };
+            const handleStatClick = (filter) => { setFilterMode(filter); setTab('FLEET'); };
+            const getDelayDuration = (eta) => { const d = safeDate(eta); if(!d) return ''; const diff = Date.now() - d.getTime(); if(diff < 0) return 'Not yet due'; const hours = Math.floor(diff / 3600000); const mins = Math.floor((diff % 3600000) / 60000); return `${hours}h ${mins}m`; };
+
+            // --- RENDERERS ---
+
+            const renderArrivalModal = () => {
+                 if (!showArrivalForm) return null;
+                 const freeDocksCount = activeDocks.filter(d => {
+                     const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                     return d.status === 'FREE' && !isOccupied;
+                 }).length;
+                 
+                 return (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-0 md:p-4 overflow-y-auto" onClick={()=>setShowArrivalForm(false)}>
+                        <div className="glass w-full min-h-screen md:min-h-0 md:max-w-3xl md:rounded-xl border-none md:border border-slate-700 shadow-2xl overflow-hidden animate-slide-in flex flex-col" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center p-4 border-b border-slate-700 bg-slate-900/80 sticky top-0 z-10 backdrop-blur">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2"><Icon name="Plus" size={24} className="text-blue-500"/> Register Arrival</h3>
+                                <button onClick={()=>setShowArrivalForm(false)} className="text-slate-400 hover:text-white"><Icon name="X" size={24}/></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                                {freeDocksCount === 0 && (
+                                    <div className="mb-4 p-3 bg-rose-950/50 border border-rose-900 text-rose-300 text-sm rounded flex items-center gap-2">
+                                        <Icon name="Alert" size={16}/> Warning: No free docks available.
+                                    </div>
+                                )}
+                                {/* Basic Info */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Plate Number *</label><input autoFocus className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-lg font-mono uppercase focus:border-blue-500 outline-none" placeholder="ABC-1234" value={arrivalData.plate} onChange={e=>setArrivalData({...arrivalData, plate: e.target.value})} /></div>
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Carrier *</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-lg uppercase focus:border-blue-500 outline-none" placeholder="Company Name" value={arrivalData.carrier} onChange={e=>setArrivalData({...arrivalData, carrier: e.target.value})} /></div>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Type</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.type} onChange={e=>setArrivalData({...arrivalData, type: e.target.value})}><option value="INBOUND">Inbound</option><option value="OUTBOUND">Outbound</option><option value="CROSS_DOCK">Cross Dock</option></select></div>
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Priority</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.priority} onChange={e=>setArrivalData({...arrivalData, priority: e.target.value})}><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option></select></div>
+                                    <div className="col-span-2"><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Initial Status</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.status} onChange={e=>setArrivalData({...arrivalData, status: e.target.value})}><option value="PLANNED">Planned (Future)</option><option value="ARRIVED">Arrived (Gate)</option><option value="WAITING">Waiting (Yard)</option><option value="ASSIGNED">Assigned (Dock)</option></select></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">ETA (Planned)</label><input type="datetime-local" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.eta} onChange={e=>setArrivalData({...arrivalData, eta: e.target.value})} /></div>
+                                    {(arrivalData.status === 'ARRIVED' || arrivalData.status === 'WAITING' || arrivalData.status === 'ASSIGNED') && (<div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Actual Arrival</label><input type="datetime-local" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.actualArrival} onChange={e=>setArrivalData({...arrivalData, actualArrival: e.target.value})} /></div>)}
+                                </div>
+                                {arrivalData.status === 'ASSIGNED' && (
+                                    <div>
+                                        <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Assign Dock</label>
+                                        <select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.dockId} onChange={e=>setArrivalData({...arrivalData, dockId: e.target.value})}>
+                                            <option value="">-- Select Dock --</option>
+                                            {activeDocks.filter(d=>d.status==='FREE').map(d=><option key={d.id} value={d.id}>{d.name} ({d.type})</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800 space-y-4">
+                                    <div className="font-bold text-slate-300 text-sm uppercase flex items-center gap-2"><Icon name="User" size={16}/> Driver & Cargo Info</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                         <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Driver Name</label><input list="driver-list" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.driverName} onChange={e=>{ const val=e.target.value; const existing=savedDrivers.find(d=>d.name===val); if(existing){ setArrivalData({...arrivalData, driverName:val, driverPhone:existing.phone, driverLanguage:existing.language||'N/A', isFrequentDriver:true}) } else { setArrivalData({...arrivalData, driverName:val}) } }} /><datalist id="driver-list">{savedDrivers.map(d=><option key={d.id} value={d.name}>{d.phone}</option>)}</datalist></div>
+                                         <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Phone</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.driverPhone} onChange={e=>setArrivalData({...arrivalData, driverPhone:e.target.value})} /></div>
+                                         <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Trailer Plate</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white uppercase focus:border-blue-500 outline-none" value={arrivalData.trailerPlate} onChange={e=>setArrivalData({...arrivalData, trailerPlate:e.target.value})} /></div>
+                                         <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Cargo Description</label><input className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={arrivalData.cargoDescription} onChange={e=>setArrivalData({...arrivalData, cargoDescription:e.target.value})} /></div>
+                                    </div>
+                                    <div className="flex items-center gap-2"><input type="checkbox" id="freqDriver" checked={arrivalData.isFrequentDriver} onChange={e=>setArrivalData({...arrivalData, isFrequentDriver:e.target.checked})} className="w-4 h-4 rounded bg-slate-800 border-slate-600" /><label htmlFor="freqDriver" className="text-sm text-slate-400">Save as Frequent Driver</label></div>
+                                </div>
+                                <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Notes</label><textarea className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" rows="2" value={arrivalData.notes} onChange={e=>setArrivalData({...arrivalData, notes: e.target.value})}></textarea></div>
+                            </div>
+                            <div className="p-4 border-t border-slate-700 bg-slate-900/80 flex gap-3">
+                                <button onClick={(e)=>validateAndRegister(e, false)} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-lg">Register & Close</button>
+                                <button onClick={(e)=>validateAndRegister(e, true)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg text-lg">Register & New</button>
+                            </div>
+                        </div>
+                    </div>
+                 );
+            };
+
+            const renderDockModal = () => {
+                if (!showDockModal) return null;
+                const isEdit = !!editingDock;
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={()=>setShowDockModal(false)}>
+                        <div className="glass w-full max-w-lg rounded-xl border border-slate-700 shadow-2xl overflow-hidden animate-slide-in" onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-white flex items-center gap-3"><div className="p-2 bg-blue-600/20 rounded-lg text-blue-500"><Icon name="Anchor" size={24}/></div> {isEdit ? `Edit ${editingDock.name}` : 'Add New Dock'}</h2>
+                                {!isEditingDockMode && isEdit && <button onClick={()=>setIsEditingDockMode(true)} className="text-blue-400 hover:text-white flex items-center gap-1 text-sm font-bold"><Icon name="Edit" size={16}/> Edit</button>}
+                            </div>
+                            <div className="p-6">
+                                {isEditingDockMode ? (
+                                    <form onSubmit={handleSaveDock} className="space-y-4">
+                                        {dockFormError && <div className="p-3 bg-rose-950/50 border border-rose-900 text-rose-300 text-sm rounded">{dockFormError}</div>}
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Dock Name</label><input required className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={dockForm.name} onChange={e=>setDockForm({...dockForm, name: e.target.value})} placeholder="e.g. Dock 1" /></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Type</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={dockForm.type} onChange={e=>setDockForm({...dockForm, type: e.target.value})}><option value="INBOUND">Inbound</option><option value="OUTBOUND">Outbound</option><option value="MIXED">Mixed</option></select></div>
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Status</label><select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={dockForm.status} onChange={e=>setDockForm({...dockForm, status: e.target.value})}><option value="FREE">Active (Free)</option><option value="MAINTENANCE">Maintenance</option><option value="BLOCKED">Blocked</option></select></div>
+                                        </div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Notes / Reason</label><textarea className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" rows="3" value={dockForm.notes} onChange={e=>setDockForm({...dockForm, notes: e.target.value})} placeholder="Maintenance reason, restrictions, etc." /></div>
+                                        {!isEdit && (
+                                            <div>
+                                                <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Assign Truck (Optional)</label>
+                                                <select className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" value={dockForm.assignTruckId} onChange={e=>setDockForm({...dockForm, assignTruckId: e.target.value})}>
+                                                    <option value="">-- None --</option>
+                                                    {activeTrucks.filter(t=>t.status==='WAITING' && !t.dockId).map(t=><option key={t.id} value={t.id}>{t.plate} ({t.carrier})</option>)}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div className="flex gap-3 pt-4">
+                                            <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg text-lg">Save</button>
+                                            <button type="button" onClick={()=>{ isEdit ? setIsEditingDockMode(false) : setShowDockModal(false) }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg text-lg">Cancel</button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800 text-center"><div className="text-xs uppercase font-bold text-slate-500 mb-1">Status</div><StatusBadge status={editingDock.status} /></div>
+                                            <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800 text-center"><div className="text-xs uppercase font-bold text-slate-500 mb-1">Type</div><div className="font-bold text-white">{editingDock.type}</div></div>
+                                        </div>
+                                        {(editingDock.status==='MAINTENANCE' || editingDock.status==='BLOCKED') && editingDock.notes && (
+                                            <div className="p-4 bg-amber-900/20 border border-amber-900/50 rounded-xl text-amber-200 text-sm">
+                                                <div className="font-bold mb-1 flex items-center gap-2"><Icon name="Alert" size={16}/> Restrictions</div>
+                                                {editingDock.notes}
+                                            </div>
+                                        )}
+                                        <div className="space-y-3">
+                                            <h4 className="font-bold text-white text-sm uppercase flex items-center gap-2 border-b border-slate-800 pb-2"><Icon name="Clock" size={16}/> Recent Activity</h4>
+                                            <div className="max-h-40 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+                                                {editingDock.history && editingDock.history.slice().reverse().map((h,i) => (
+                                                    <div key={i} className="flex gap-3 text-sm">
+                                                        <div className="text-slate-500 text-xs w-24 shrink-0">{safeDate(h.timestamp)?.toLocaleDateString()}</div>
+                                                        <div className="flex-1"><div className="text-white">{h.action}</div><div className="text-[10px] text-slate-500">by {h.user}</div></div>
+                                                    </div>
+                                                ))}
+                                                {(!editingDock.history || editingDock.history.length === 0) && <div className="text-slate-500 italic text-sm">No history available.</div>}
+                                            </div>
+                                        </div>
+                                        <div className="pt-4 border-t border-slate-800 flex justify-between">
+                                            <button onClick={handleDeleteDock} className="text-rose-400 hover:text-rose-300 text-sm font-bold flex items-center gap-2 px-3 py-2 hover:bg-rose-900/20 rounded-lg transition-colors"><Icon name="Trash" size={16}/> Remove Dock</button>
+                                            <button onClick={()=>setShowDockModal(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-bold">Close</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderDockSelectorModal = () => {
+                if (!showDockSelector) return null;
+                // Safety: Do not show selector if truck is COMPLETED or HANDLING
+                if (selectedTruck && (selectedTruck.status === 'COMPLETED' || selectedTruck.status === 'HANDLING')) return null;
+
+                const freeDocks = activeDocks.filter(d => {
+                    const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                    return !isOccupied && (d.status === 'FREE' || d.id === selectedTruck.dockId);
+                });
+                
+                return (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={() => setShowDockSelector(false)}>
+                        <div className="glass w-full max-w-lg rounded-xl border border-slate-700 shadow-2xl overflow-hidden animate-slide-in flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                            <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                <h3 className="font-bold text-white text-lg">Select Dock</h3>
+                                <button onClick={() => setShowDockSelector(false)} className="text-slate-400 hover:text-white"><Icon name="X" size={20}/></button>
+                            </div>
+                            <div className="p-4 overflow-y-auto grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={async () => {
+                                        await api.saveTruck({ ...selectedTruck, dockId: null, status: selectedTruck.status === 'ASSIGNED' ? 'WAITING' : selectedTruck.status });
+                                        loadData();
+                                        setSelectedTruck({ ...selectedTruck, dockId: null, status: selectedTruck.status === 'ASSIGNED' ? 'WAITING' : selectedTruck.status });
+                                        setShowDockSelector(false);
+                                    }}
+                                    className="col-span-2 p-3 bg-slate-900/50 hover:bg-rose-900/20 border border-slate-800 hover:border-rose-800 rounded-lg flex items-center justify-center gap-2 transition-all text-slate-400 hover:text-rose-400 mb-2"
+                                >
+                                    <Icon name="X" size={16}/> Unassign Dock
+                                </button>
+                                {freeDocks.length === 0 ? <div className="col-span-2 text-center text-slate-500 py-8">No free docks available.</div> : 
+                                freeDocks.map(d => (
+                                    <button 
+                                        key={d.id}
+                                        onClick={async () => {
+                                            const newStatus = (selectedTruck.status === 'WAITING' || selectedTruck.status === 'PLANNED') ? 'ASSIGNED' : selectedTruck.status;
+                                            await api.saveTruck({ ...selectedTruck, dockId: d.id, status: newStatus });
+                                            loadData(); 
+                                            setSelectedTruck({ ...selectedTruck, dockId: d.id, status: newStatus });
+                                            setShowDockSelector(false);
+                                        }}
+                                        className={`p-4 border rounded-lg flex flex-col items-center gap-2 transition-all ${selectedTruck.dockId === d.id ? 'bg-blue-900/40 border-blue-500 ring-1 ring-blue-500' : 'bg-slate-800 hover:bg-blue-900/30 border-slate-700 hover:border-blue-500'}`}
+                                    >
+                                        <Icon name="Anchor" className={selectedTruck.dockId === d.id ? "text-blue-400" : "text-emerald-400"} size={24}/>
+                                        <span className="font-bold text-white">{d.name}</span>
+                                        <span className="text-[10px] uppercase text-slate-500">{d.type}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderTruckModal = () => {
+                if (!selectedTruck) return null;
+                const isCancelled = selectedTruck.status === 'CANCELLED';
+                
+                // --- PROCESS FLOW LOGIC ---
+                const processSteps = ['PLANNED', 'ARRIVED', 'WAITING', 'ASSIGNED', 'HANDLING', 'COMPLETED'];
+                const currentStepIndex = processSteps.indexOf(selectedTruck.status) === -1 ? -1 : processSteps.indexOf(selectedTruck.status);
+                
+                // --- TIMING CALCULATIONS ---
+                // We convert strings to Date objects for logic checks, but pass RAW STRINGS to getDuration
+                // to avoid safeDate double-conversion bug (which breaks Date objects converted to strings)
+                const actualArrivalObj = safeDate(selectedTruck.actualArrival);
+                const handlingStartObj = safeDate(selectedTruck.handlingStartTime);
+                const completionTimeObj = safeDate(selectedTruck.completionTime);
+                const now = new Date();
+
+                let waitingDuration = '-';
+                if (selectedTruck.actualArrival) {
+                    const endWait = handlingStartObj || (['WAITING', 'ASSIGNED', 'ARRIVED'].includes(selectedTruck.status) ? now : (selectedTruck.status === 'COMPLETED' ? completionTimeObj : null));
+                    if (endWait) waitingDuration = getDuration(selectedTruck.actualArrival, endWait);
+                }
+
+                let handlingDuration = '-';
+                if (selectedTruck.handlingStartTime) {
+                    const endHandle = completionTimeObj || (selectedTruck.status === 'HANDLING' ? now : null);
+                    if (endHandle) handlingDuration = getDuration(selectedTruck.handlingStartTime, endHandle);
+                }
+                
+                const handleQuickStatusUpdate = async (newStatus) => {
+                    if (isCancelled) return; 
+
+                    if ((newStatus === 'ASSIGNED' || newStatus === 'HANDLING') && !selectedTruck.dockId) {
+                        setAlertModal({ title: 'Dock Required', message: `Please assign a dock before moving to ${newStatus}.` });
+                        setShowDockSelector(true);
+                        return;
+                    }
+                    let updates = { status: newStatus };
+                    const nowObj = new Date();
+                    const offset = nowObj.getTimezoneOffset() * 60000;
+                    const localNow = new Date(nowObj.getTime() - offset).toISOString().slice(0,16);
+                    const utcNow = new Date().toISOString();
+
+                    // Fix: Record actualArrival if not present and status implies presence
+                    if (['ARRIVED', 'WAITING', 'ASSIGNED', 'HANDLING', 'COMPLETED'].includes(newStatus)) {
+                        if (!selectedTruck.actualArrival) {
+                            updates.actualArrival = localNow;
+                        }
+                    }
+
+                    // Fix: Record handlingStartTime
+                    if (newStatus === 'HANDLING') {
+                        if (!selectedTruck.handlingStartTime) {
+                             updates.handlingStartTime = utcNow;
+                        }
+                        if (!selectedTruck.handlingType) {
+                            updates.handlingType = selectedTruck.type === 'INBOUND' ? 'UNLOADING' : 'LOADING';
+                        }
+                    }
+
+                    if (newStatus === 'COMPLETED') {
+                        updates.completionTime = utcNow;
+                        updates.priority = 'NORMAL';
+                        if (selectedTruck.dockId) {
+                            const dockName = activeDocks.find(d => d.id === selectedTruck.dockId)?.name || selectedTruck.dockId;
+                            updates.historyDock = dockName;
+                        }
+                        updates.dockId = null;
+                    }
+                    
+                    const updatedTruck = { ...selectedTruck, ...updates };
+                    setSelectedTruck(updatedTruck); 
+                    await api.saveTruck(updatedTruck);
+                    loadData();
+                };
+
+                // Dock Display Logic
+                const assignedDock = activeDocks.find(d => d.id === selectedTruck.dockId);
+                const dockStatusDisplay = assignedDock ? (assignedDock.status === 'FREE' ? 'OCCUPIED' : assignedDock.status) : 'UNKNOWN';
+                const canEditDock = !isCancelled && selectedTruck.status !== 'COMPLETED' && selectedTruck.status !== 'HANDLING';
+                const hasDock = !!selectedTruck.dockId;
+                const freeDocksCount = activeDocks.filter(d => {
+                     const isOccupied = activeTrucks.some(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                     return d.status === 'FREE' && !isOccupied;
+                }).length;
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-0 md:p-4 overflow-y-auto" onClick={()=>{setSelectedTruck(null); setEditingSection(null);}}>
+                        <div className="glass w-full min-h-screen md:min-h-0 md:max-w-3xl md:rounded-xl border-none md:border border-slate-700 shadow-2xl overflow-hidden animate-slide-in flex flex-col" onClick={e => e.stopPropagation()}>
+                            
+                            {/* HEADER */}
+                            <div className="flex justify-between items-start p-4 border-b border-slate-700 bg-slate-900/80 sticky top-0 z-10 backdrop-blur">
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-xl md:text-3xl font-bold text-white tracking-tight font-mono">
+                                            {selectedTruck.plate.toUpperCase()}
+                                        </h2>
+                                        <StatusBadge status={selectedTruck.status} />
+                                    </div>
+                                    <div className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{selectedTruck.carrier.toUpperCase()}</div>
+                                    {selectedTruck.priority === 'URGENT' && <div className="mt-2 inline-flex items-center gap-1 text-rose-400 font-bold text-xs uppercase animate-pulse"><Icon name="Alert" size={14}/> Urgent Priority</div>}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={handleTruckRefresh} className={`p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-emerald-400 transition-colors ${isRefreshing ? 'opacity-50 cursor-wait' : ''}`} disabled={isRefreshing} title="Refresh Data">
+                                        <Icon name="RefreshCw" size={20} className={isRefreshing ? "animate-spin" : ""}/>
+                                    </button>
+                                    <button onClick={()=>{setSelectedTruck(null); setEditingSection(null);}} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"><Icon name="X" size={20}/></button>
+                                </div>
+                            </div>
+
+                            <div className="p-4 overflow-y-auto flex-1 bg-gradient-to-b from-slate-900 to-slate-950 pb-32 md:pb-6 space-y-4 md:space-y-6">
+                                
+                                {/* 1. PROCESS FLOW (Visual) */}
+                                {!isCancelled && (
+                                <div className="overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+                                    <div className="flex items-center min-w-max gap-1">
+                                        {processSteps.map((step, idx) => {
+                                            const isCompleted = idx < currentStepIndex;
+                                            const isCurrent = idx === currentStepIndex;
+                                            const isNext = idx === currentStepIndex + 1;
+                                            
+                                            return (
+                                                <div key={step} onClick={() => isNext ? handleQuickStatusUpdate(step) : null} className={`
+                                                    flex items-center px-2 py-1 md:px-3 md:py-1.5 rounded-full border text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all cursor-default select-none
+                                                    ${isCompleted ? 'bg-emerald-900/20 border-emerald-900 text-emerald-500' : ''}
+                                                    ${isCurrent ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)] scale-105' : ''}
+                                                    ${isNext ? 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 cursor-pointer' : ''}
+                                                    ${(!isCompleted && !isCurrent && !isNext) ? 'bg-slate-950 border-slate-800 text-slate-700 opacity-50' : ''}
+                                                `}>
+                                                    {isCompleted && <Icon name="CheckCircle" size={10} className="mr-1"/>}
+                                                    {step}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                )}
+
+                                {/* 2. TIMINGS ROW (New) */}
+                                {!isCancelled && selectedTruck.status !== 'PLANNED' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-bold text-slate-500">Wait Duration</div>
+                                                <div className={`text-xl font-mono font-bold ${waitingDuration === '-' ? 'text-slate-600' : 'text-amber-400'}`}>{waitingDuration}</div>
+                                            </div>
+                                            <Icon name="Clock" size={24} className="text-amber-900/50"/>
+                                        </div>
+                                        <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-bold text-slate-500">Handling Time</div>
+                                                <div className={`text-xl font-mono font-bold ${handlingDuration === '-' ? 'text-slate-600' : 'text-blue-400'}`}>{handlingDuration}</div>
+                                            </div>
+                                            <Icon name="Activity" size={24} className="text-blue-900/50"/>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 3. CANCELLED OR ACTION BUTTON */}
+                                {isCancelled ? (
+                                    <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-900/50 flex flex-col gap-3">
+                                        <div className="flex items-center gap-2 text-rose-500 font-bold border-b border-rose-900/30 pb-2">
+                                            <Icon name="Alert" size={20}/> <span>Truck Cancelled</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <span className="text-[10px] uppercase text-rose-400/70 font-bold block">Reason</span>
+                                                <span className="text-white text-base font-medium">"{selectedTruck.cancellationReason || 'No reason provided'}"</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] uppercase text-rose-400/70 font-bold block">Type</span>
+                                                <span className="text-white">{selectedTruck.cancellationType || 'N/A'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] uppercase text-rose-400/70 font-bold block">Cancelled Date</span>
+                                                <span className="text-white font-mono">{safeDate(selectedTruck.cancellationTime)?.toLocaleString() || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] uppercase text-rose-400/70 font-bold block">Operator</span>
+                                                <span className="text-white">{selectedTruck.cancelledBy || 'Unknown'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* Normal Action Button */
+                                    selectedTruck.status !== 'COMPLETED' && (
+                                        <div className="w-full">
+                                            {selectedTruck.status === 'PLANNED' && <button onClick={()=>handleQuickStatusUpdate('ARRIVED')} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 active:scale-[0.98]"><Icon name="MapPin" size={24}/> Confirm Arrival</button>}
+                                            {selectedTruck.status === 'ARRIVED' && <button onClick={()=>handleQuickStatusUpdate('WAITING')} className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 active:scale-[0.98]"><Icon name="Clock" size={24}/> Check-in Waiting</button>}
+                                            {selectedTruck.status === 'WAITING' && (
+                                                !hasDock && freeDocksCount === 0 ? (
+                                                    <div className="w-full py-4 bg-rose-950/30 border border-rose-900/50 rounded-xl flex items-center justify-center gap-2 text-rose-400 font-bold">
+                                                        <Icon name="Alert" size={24}/>
+                                                        <span>No Docks Available - Cannot Assign</span>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={()=>{ if(selectedTruck.dockId) handleQuickStatusUpdate('ASSIGNED'); else setShowDockSelector(true); }} 
+                                                        className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 active:scale-[0.98] ${selectedTruck.dockId ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 border-2 border-dashed border-slate-600 hover:border-slate-500 hover:text-white'}`}>
+                                                        {selectedTruck.dockId ? <><Icon name="Anchor" size={24}/> Confirm Dock {activeDocks.find(d=>d.id===selectedTruck.dockId)?.name}</> : <><Icon name="Anchor" size={24}/> Assign Dock</>}
+                                                    </button>
+                                                )
+                                            )}
+                                            {selectedTruck.status === 'ASSIGNED' && <button onClick={()=>handleQuickStatusUpdate('HANDLING')} className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 active:scale-[0.98]"><Icon name="ArrowDownCircle" size={24}/> Start Operation</button>}
+                                            {selectedTruck.status === 'HANDLING' && <button onClick={()=>handleQuickStatusUpdate('COMPLETED')} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 active:scale-[0.98]"><Icon name="CheckCircle" size={24}/> Finish & Release</button>}
+                                        </div>
+                                    )
+                                )}
+
+                                {/* 4. INFO CARDS GRID */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    
+                                    {/* Cargo Card */}
+                                    <div className={`glass p-4 rounded-xl border border-slate-700 space-y-3 ${isCancelled ? 'opacity-75' : ''}`}>
+                                        <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                                            <div className="flex items-center gap-2"><Icon name="Box" className="text-blue-400"/><span className="font-bold text-slate-300 uppercase text-xs">Cargo</span></div>
+                                            {!isCancelled && <button onClick={()=>setEditingSection('CARGO')} className="text-slate-500 hover:text-blue-400 p-1"><Icon name="Edit" size={16}/></button>}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                                            <div><span className="block text-[10px] text-slate-500 font-bold uppercase">Type</span><TypeIcon type={selectedTruck.type} /></div>
+                                            <div><span className="block text-[10px] text-slate-500 font-bold uppercase">Trailer</span><span className="text-white font-mono">{selectedTruck.trailerPlate || '-'}</span></div>
+                                            <div className="col-span-2"><span className="block text-[10px] text-slate-500 font-bold uppercase">Description</span><span className="text-white">{selectedTruck.cargoDescription || 'No description'}</span></div>
+                                            <div><span className="block text-[10px] text-slate-500 font-bold uppercase">Qty</span><span className="text-white">{selectedTruck.cargoQty || '-'}</span></div>
+                                            <div><span className="block text-[10px] text-slate-500 font-bold uppercase">Weight</span><span className="text-white">{selectedTruck.cargoWeight || '-'}</span></div>
+                                            {selectedTruck.cargoNotes && <div className="col-span-2 bg-amber-900/20 p-2 rounded border border-amber-900/30 text-xs italic text-amber-100">{selectedTruck.cargoNotes}</div>}
+                                        </div>
+                                    </div>
+
+                                    {/* Dock Card - DISABLED/NA IF CANCELLED/COMPLETED/HANDLING */}
+                                    <div className={`glass p-4 rounded-xl border border-slate-700 space-y-3 flex flex-col ${isCancelled ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                                            <div className="flex items-center gap-2"><Icon name="Anchor" className={isCancelled ? "text-slate-500" : "text-emerald-400"}/><span className="font-bold text-slate-300 uppercase text-xs">Dock</span></div>
+                                            {canEditDock && <button onClick={()=>setShowDockSelector(true)} className="text-slate-500 hover:text-blue-400 p-1"><Icon name="Edit" size={16}/></button>}
+                                        </div>
+                                        <div className="flex-1 flex flex-col items-center justify-center p-3 bg-slate-900/50 rounded-lg border border-slate-800 min-h-[100px]">
+                                            {isCancelled ? (
+                                                <div className="text-slate-500 italic flex flex-col items-center gap-2 text-xs">
+                                                    <Icon name="X" size={24} className="opacity-50"/>
+                                                    <span>Not Applicable</span>
+                                                </div>
+                                            ) : selectedTruck.dockId ? (
+                                                <><div className="text-3xl font-bold text-white mb-1">{assignedDock?.name || selectedTruck.dockId}</div><StatusBadge status={dockStatusDisplay} /></>
+                                            ) : (
+                                                selectedTruck.status === 'COMPLETED' ? (
+                                                    <div className="text-center"><span className="text-slate-500 text-xs uppercase block mb-1">Completed at</span><span className="text-emerald-400 font-bold text-xl">{selectedTruck.historyDock || 'Unknown Dock'}</span></div>
+                                                ) : (<div className="text-slate-500 italic flex flex-col items-center gap-2 text-xs"><Icon name="Alert" size={24} className="opacity-50"/><span>No Dock Assigned</span></div>)
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Driver Card */}
+                                    <div className={`glass p-4 rounded-xl border border-slate-700 space-y-3 ${isCancelled ? 'opacity-75' : ''}`}>
+                                        <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                                            <div className="flex items-center gap-2"><Icon name="User" className="text-slate-400"/><span className="font-bold text-slate-300 uppercase text-xs">Driver</span></div>
+                                            {!isCancelled && <button onClick={()=>setEditingSection('DRIVER')} className="text-slate-500 hover:text-blue-400 p-1"><Icon name="Edit" size={16}/></button>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between"><span className="text-slate-500 text-[10px] uppercase font-bold">Name</span><span className="text-white text-sm font-bold">{selectedTruck.driverName || '-'}</span></div>
+                                            <div className="flex justify-between items-center"><span className="text-slate-500 text-[10px] uppercase font-bold">Phone</span><span className="text-blue-400 font-mono text-sm">{selectedTruck.driverPhone || '-'}</span></div>
+                                            <div className="flex justify-between"><span className="text-slate-500 text-[10px] uppercase font-bold">Language</span><span className="text-white text-sm">{selectedTruck.driverLanguage || 'N/A'}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* History Log Card */}
+                                    <div className="glass p-4 rounded-xl border border-slate-700 space-y-3 md:col-span-2">
+                                        <div className="flex items-center gap-2 border-b border-slate-700 pb-2">
+                                            <Icon name="Clock" className="text-slate-400"/>
+                                            <span className="font-bold text-slate-300 uppercase text-xs">Full History Log</span>
+                                        </div>
+                                        <div className="space-y-3 text-sm max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                            {selectedTruck.history && selectedTruck.history.slice().reverse().map((h, i) => (
+                                                <div key={i} className="flex gap-3">
+                                                    <div className="flex flex-col items-center pt-1">
+                                                        <div className="w-2 h-2 rounded-full bg-slate-600"></div>
+                                                        {i < selectedTruck.history.length - 1 && <div className="w-px h-full bg-slate-800 my-1"></div>}
+                                                    </div>
+                                                    <div className="pb-2 w-full">
+                                                        <div className="text-white text-xs font-medium">{h.action}</div>
+                                                        <div className="text-[10px] text-slate-500 flex justify-between mt-0.5">
+                                                            <span>{safeDate(h.timestamp)?.toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                                                            <span className="text-slate-600 italic">by {h.user}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!selectedTruck.history || selectedTruck.history.length === 0) && <div className="text-slate-500 italic text-xs text-center py-2">No history recorded.</div>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* General Notes Section */}
+                                <div className={`glass p-4 rounded-xl border border-slate-700 ${isCancelled ? 'opacity-75' : ''}`}>
+                                    <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-3">
+                                        <div className="flex items-center gap-2"><Icon name="FileText" className="text-slate-400"/><span className="font-bold text-slate-300 uppercase text-xs">General Notes & Details</span></div>
+                                        {!isCancelled && <button onClick={()=>setEditingSection('DETAILS')} className="text-slate-500 hover:text-blue-400 p-1"><Icon name="Edit" size={16}/></button>}
+                                    </div>
+                                    <p className="text-slate-300 whitespace-pre-line text-sm">{selectedTruck.notes || 'No notes.'}</p>
+                                    <div className="mt-3 text-xs text-slate-500 font-mono">ETA: {selectedTruck.eta ? safeDate(selectedTruck.eta).toLocaleString() : 'N/A'}</div>
+                                </div>
+                                
+                                {selectedTruck.status !== 'COMPLETED' && !isCancelled && (
+                                    <div className="mt-4 pt-4 border-t border-slate-800">
+                                         <button onClick={()=>setShowCancellationModal(true)} className="w-full py-3 text-rose-400 hover:bg-rose-950/30 border border-rose-900/30 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors">
+                                             <Icon name="X" size={18}/> Cancel Process
+                                         </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderEditModal = () => {
+                if (!editingSection) return null;
+                const isCargo = editingSection === 'CARGO';
+                const isDriver = editingSection === 'DRIVER';
+                const isDetails = editingSection === 'DETAILS';
+                const freeDocksCount = activeDocks.filter(d => d.status === 'FREE' && !activeTrucks.some(t => t.dockId === d.id && t.id !== selectedTruck.id)).length;
+                
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    const form = e.target;
+                    const formData = new FormData(form);
+                    const updates = {};
+                    formData.forEach((value, key) => updates[key] = value);
+                    if (isDriver) updates.isFrequentDriver = form.querySelector('[name="isFrequentDriver"]').checked;
+                    
+                    const newTruck = { ...selectedTruck, ...updates };
+                    api.saveTruck(newTruck).then(() => {
+                        setSelectedTruck(newTruck);
+                        setEditingSection(null);
+                        loadData();
+                    });
+                };
+
+                return (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-4" onClick={() => setEditingSection(null)}>
+                        <div className="glass w-full max-w-lg rounded-xl border border-slate-700 shadow-2xl p-6 animate-slide-in" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                <Icon name="Edit" className="text-blue-500"/> Edit {isCargo ? 'Cargo' : isDriver ? 'Driver' : 'Details'}
+                            </h3>
+                            {isDetails && freeDocksCount === 0 && (
+                                <div className="mb-4 p-3 bg-rose-950/50 border border-rose-900 text-rose-300 text-sm rounded flex items-center gap-2">
+                                    <Icon name="Alert" size={16}/> Warning: No free docks available.
+                                </div>
+                            )}
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                {isCargo && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Trailer</label><input name="trailerPlate" defaultValue={selectedTruck.trailerPlate} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Type</label><select name="cargoType" defaultValue={selectedTruck.cargoType} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"><option value="PALLETS">Pallets</option><option value="CONTAINER">Container</option><option value="LOOSE">Loose</option></select></div>
+                                        </div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Description</label><input name="cargoDescription" defaultValue={selectedTruck.cargoDescription} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Qty</label><input name="cargoQty" defaultValue={selectedTruck.cargoQty} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Weight</label><input name="cargoWeight" defaultValue={selectedTruck.cargoWeight} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                        </div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Notes</label><input name="cargoNotes" defaultValue={selectedTruck.cargoNotes} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                    </>
+                                )}
+                                {isDriver && (
+                                    <>
+                                        <div>
+                                            <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Name</label>
+                                            <input 
+                                                name="driverName" 
+                                                defaultValue={selectedTruck.driverName} 
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"
+                                                list="edit-driver-list"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    const found = savedDrivers.find(d => d.name === val);
+                                                    if (found && e.target.form) {
+                                                        const form = e.target.form;
+                                                        if(form.elements['driverPhone']) form.elements['driverPhone'].value = found.phone || '';
+                                                        if(form.elements['driverLanguage']) form.elements['driverLanguage'].value = found.language || 'N/A';
+                                                        if(form.elements['isFrequentDriver']) form.elements['isFrequentDriver'].checked = true;
+                                                    }
+                                                }}
+                                            />
+                                            <datalist id="edit-driver-list">
+                                                {savedDrivers.map(d => <option key={d.id} value={d.name}>{d.phone}</option>)}
+                                            </datalist>
+                                        </div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Phone</label><input name="driverPhone" defaultValue={selectedTruck.driverPhone} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"/></div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Language</label><select name="driverLanguage" defaultValue={selectedTruck.driverLanguage} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"><option value="English">English</option><option value="Spanish">Spanish</option><option value="Portuguese">Portuguese</option><option value="Other">Other</option></select></div>
+                                        <label className="flex items-center gap-2"><input type="checkbox" name="isFrequentDriver" defaultChecked={selectedTruck.isFrequentDriver} className="w-4 h-4"/><span className="text-sm text-slate-300">Frequent Driver</span></label>
+                                    </>
+                                )}
+                                {isDetails && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Plate</label><input name="plate" defaultValue={selectedTruck.plate} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white uppercase"/></div>
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Carrier</label><input name="carrier" defaultValue={selectedTruck.carrier} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white uppercase"/></div>
+                                        </div>
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">ETA</label><input type="datetime-local" name="eta" defaultValue={selectedTruck.eta} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" /></div>
+                                        
+                                        {/* Added Timestamp Editing */}
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Actual Arrival</label><input type="datetime-local" name="actualArrival" defaultValue={selectedTruck.actualArrival} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" /></div>
+                                        {(selectedTruck.status === 'HANDLING' || selectedTruck.status === 'COMPLETED') && (
+                                            <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Handling Start</label><input type="datetime-local" name="handlingStartTime" defaultValue={selectedTruck.handlingStartTime} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" /></div>
+                                        )}
+
+                                        <div><label className="text-xs uppercase font-bold text-slate-500 mb-2 block">General Notes</label><textarea name="notes" defaultValue={selectedTruck.notes} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white" rows="3"></textarea></div>
+                                    </>
+                                )}
+                                <div className="flex gap-3 pt-4">
+                                    <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg">Save</button>
+                                    <button type="button" onClick={()=>setEditingSection(null)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-lg">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderContent = () => {
+                if (tab === 'SETTINGS') return <SettingsView user={user} onUpdateUser={onUpdateUser} />;
+                if (tab === 'DRIVERS') return <DriversView drivers={savedDrivers} loadDrivers={loadDrivers} />;
+                if (tab === 'USERS') {
+                    const isAdmin = user.role === 'Admin';
+                    return (
+                        <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
+                            <div className="flex justify-between items-center">
+                                <div><h2 className="text-2xl font-bold">Team Management</h2><p className="opacity-70 text-sm">Manage access and roles</p></div>
+                                {isAdmin && <button onClick={()=>{setEditingUser(null); setUserModalOpen(true);}} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Icon name="Plus" size={18}/> Add User</button>}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {users.map(u => (
+                                    <div key={u.id} className="glass p-4 rounded-xl border border-slate-700 flex items-center gap-4 hover:bg-slate-800/50 transition-colors group relative">
+                                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-lg font-bold opacity-70 border border-slate-600 overflow-hidden">{u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover"/> : u.name.charAt(0)}</div>
+                                        <div className="flex-1"><div className="font-bold">{u.name}</div><div className="text-xs opacity-70 uppercase font-bold">{u.role}</div><div className="text-xs opacity-50 mt-0.5">{u.email}</div></div>
+                                        {isAdmin && (<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2"><button onClick={()=>{setEditingUser(u); setUserModalOpen(true);}} className="p-1.5 bg-blue-900/50 text-blue-400 rounded hover:bg-blue-900"><Icon name="Edit" size={14}/></button>{user.id !== u.id && <button onClick={()=>handleUserDelete(u)} className="p-1.5 bg-rose-900/50 text-rose-400 rounded hover:bg-rose-900"><Icon name="Trash" size={14}/></button>}</div>)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+                if (tab === 'DOCKS') {
+                    return (
+                        <div className="space-y-6 animate-fade-in">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                                    {['ALL', 'FREE', 'OCCUPIED', 'BLOCKED', 'MAINTENANCE'].map(f => (
+                                        <button key={f} onClick={()=>setDockFilter(f)} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dockFilter===f ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{f}</button>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2 w-full md:w-auto">
+                                    <div className="relative flex-1 md:w-64">
+                                        <div className="absolute left-3 top-2.5 text-slate-500"><Icon name="Search" size={18}/></div>
+                                        <input className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:border-blue-500 outline-none" placeholder="Search docks..." value={dockSearch} onChange={e=>setDockSearch(e.target.value)} />
+                                    </div>
+                                    {user.role === 'Admin' && <button onClick={handleAddDock} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/20"><Icon name="Plus" size={18}/><span className="hidden sm:inline">Add Dock</span></button>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {filteredDocks.map(d => {
+                                    const truck = activeTrucks.find(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                                    return (
+                                        <div key={d.id} onClick={()=>handleDockClick(d)} className={`glass p-4 rounded-xl border relative group cursor-pointer hover:scale-[1.02] transition-all flex flex-col justify-between min-h-[140px] ${d.status==='FREE' && !truck ? 'border-emerald-500/30 hover:border-emerald-500' : d.status==='BLOCKED' ? 'border-rose-500/30 bg-rose-950/10' : d.status==='MAINTENANCE' ? 'border-orange-500/30 bg-orange-950/10' : 'border-blue-500/30 hover:border-blue-500'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xl font-bold text-white">{d.name}</span>
+                                                <StatusBadge status={truck ? truck.status : d.status} />
+                                            </div>
+                                            <div className="text-xs text-slate-500 font-bold uppercase mb-4">{d.type}</div>
+                                            {truck ? (
+                                                <div className="mt-auto bg-slate-800/50 p-2 rounded border border-slate-700/50">
+                                                    <div className="text-white font-mono text-sm font-bold flex items-center justify-between">{truck.plate} <TypeIcon type={truck.type}/></div>
+                                                    <div className="text-[10px] text-slate-400 truncate">{truck.carrier}</div>
+                                                </div>
+                                            ) : d.status === 'FREE' ? (
+                                                <div className="mt-auto text-emerald-500 text-xs font-bold flex items-center gap-1"><Icon name="CheckCircle" size={14}/> Available</div>
+                                            ) : (
+                                                <div className="mt-auto text-slate-500 text-xs italic">
+                                                    {d.notes || 'No details'}
+                                                    {d.status === 'MAINTENANCE' && d.reopenDate && (
+                                                        <div className="mt-1.5 pt-1.5 border-t border-slate-700/50 text-orange-400 font-mono text-[10px]">
+                                                            <span className="block opacity-70 uppercase">Reopening:</span>
+                                                            {safeDate(d.reopenDate)?.toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (tab === 'FLEET') {
+                    return (
+                        <div className="space-y-4 animate-fade-in">
+                            <div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-900/50 p-4 rounded-xl border border-slate-800 sticky top-0 z-30 backdrop-blur-xl">
+                                <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+                                    {['ALL', 'URGENT', 'WAITING', 'PLANNED', 'TODAY'].map(m => (
+                                        <button key={m} onClick={()=>setFilterMode(m)} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all whitespace-nowrap ${filterMode===m ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{m}</button>
+                                    ))}
+                                </div>
+                                <div className="relative w-full md:w-64">
+                                    <div className="absolute left-3 top-2.5 text-slate-500"><Icon name="Search" size={18}/></div>
+                                    <input className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:border-blue-500 outline-none" placeholder="Search plate, carrier..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-[10px] uppercase font-bold text-slate-500">
+                                <div className="col-span-2">Truck / Carrier</div>
+                                <div className="col-span-1">Type</div>
+                                <div className="col-span-2">Status</div>
+                                <div className="col-span-2">Location/Dock</div>
+                                <div className="col-span-2">Timings</div>
+                                <div className="col-span-2">Wait Time</div>
+                                <div className="col-span-1 text-right">Action</div>
+                            </div>
+                            <div className="space-y-2">
+                                {sortedTrucks.length === 0 ? <div className="text-center py-12 text-slate-500">No trucks found matching criteria.</div> : 
+                                sortedTrucks.map(t => {
+                                    const isCancelled = t.status === 'CANCELLED';
+                                    const isCompleted = t.status === 'COMPLETED';
+                                    const isUrgent = t.priority === 'URGENT';
+                                    return (
+                                        <div key={t.id} onClick={()=>setSelectedTruck(t)} className={`glass p-4 md:py-3 md:px-4 rounded-xl border ${isCompleted ? 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)] bg-emerald-950/10' : isUrgent ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)] bg-rose-950/10' : 'border-slate-800'} hover:border-blue-500/50 cursor-pointer transition-all hover:bg-slate-800/30 group ${isCancelled ? 'line-through opacity-50 grayscale bg-slate-900/20' : ''}`}>
+                                            <div className="flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center">
+                                                <div className="col-span-2 flex items-center justify-between md:justify-start gap-3 mb-2 md:mb-0">
+                                                    <div>
+                                                        <div className="font-bold text-white font-mono text-lg md:text-base">{t.plate}</div>
+                                                        <div className="text-xs text-slate-400 truncate max-w-[120px]">{t.carrier}</div>
+                                                    </div>
+                                                    <div className="md:hidden"><StatusBadge status={t.status} /></div>
+                                                </div>
+                                                <div className="col-span-1 hidden md:block"><TypeIcon type={t.type}/></div>
+                                                <div className="col-span-2 hidden md:block"><StatusBadge status={t.status} /></div>
+                                                <div className="col-span-2 mb-2 md:mb-0 flex items-center gap-2">
+                                                    {t.dockId ? (
+                                                        <div className="flex items-center gap-2 text-emerald-400"><Icon name="Anchor" size={16}/><span className="font-bold">{activeDocks.find(d=>d.id===t.dockId)?.name || t.dockId}</span></div>
+                                                    ) : (
+                                                        (t.status === 'COMPLETED' || t.status === 'CANCELLED') && t.historyDock ? (
+                                                            <div className="flex items-center gap-2 text-slate-500"><Icon name="Anchor" size={16}/><span className="font-bold text-xs">Used: {t.historyDock}</span></div>
+                                                        ) : (
+                                                            <span className="text-slate-600 text-xs italic">Unassigned</span>
+                                                        )
+                                                    )}
+                                                </div>
+                                                <div className="col-span-2 text-xs text-slate-400 mb-2 md:mb-0">
+                                                    {t.actualArrival ? 
+                                                        <div><span className="text-emerald-500">Arr:</span> {safeDate(t.actualArrival).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div> : 
+                                                        <div><span className="text-blue-500">ETA:</span> {t.eta ? safeDate(t.eta).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '--'}</div>
+                                                    }
+                                                </div>
+                                                <div className="col-span-2 text-xs font-mono text-slate-300">
+                                                    {t.status === 'WAITING' ? <span className="text-amber-400">{getDuration(t.actualArrival)}</span> : 
+                                                     t.status === 'HANDLING' ? <span className="text-blue-400">{getDuration(t.handlingStartTime)}</span> : '-'}
+                                                </div>
+                                                <div className="col-span-1 text-right hidden md:block text-slate-500 group-hover:text-blue-400"><Icon name="ChevronLeft" className="rotate-180" size={18}/></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+
+                // Default DASHBOARD
+                const plannedTrucks = activeTrucks.filter(t => t.status === 'PLANNED' && !t.hidden).sort((a,b) => (safeDate(a.eta)||0) - (safeDate(b.eta)||0)).slice(0, 5);
+
+                return (
+                    <div className="space-y-6 animate-fade-in">
+                        {/* Stats Row */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatCard label="Free Docks" value={dockStats.free} icon="Anchor" color="emerald" onClick={()=>setTab('DOCKS')} />
+                            <StatCard label="Waiting" value={activeTrucks.filter(t=>t.status==='WAITING').length} icon="Clock" color="amber" onClick={()=>handleStatClick('WAITING')} />
+                            <StatCard label="In Progress" value={activeTrucks.filter(t=>t.status==='HANDLING').length} icon="Activity" color="blue" onClick={()=>handleStatClick('ALL')} />
+                            <StatCard label="Urgent" value={activeTrucks.filter(t=>t.priority==='URGENT' || t.status==='DELAYED').length} icon="Alert" color="rose" onClick={()=>handleStatClick('URGENT')} />
+                        </div>
+
+                        {/* Main Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Left Col: Urgent/Attention + Arrivals */}
+                            <div className="lg:col-span-2 space-y-6">
+                                {/* Urgent */}
+                                <div className="glass rounded-xl border border-slate-700 overflow-hidden">
+                                    <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                        <h3 className="font-bold text-white flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div> Urgent Attention</h3>
+                                        <button onClick={()=>handleStatClick('URGENT')} className="text-xs text-blue-400 font-bold hover:text-blue-300">VIEW ALL</button>
+                                    </div>
+                                    <div className="divide-y divide-slate-800">
+                                        {urgentTrucks.length === 0 ? <div className="p-8 text-center text-slate-500 italic">No urgent issues detected. Smooth sailing!</div> : 
+                                        urgentTrucks.slice(0, 5).map(t => (
+                                            <div key={t.id} onClick={()=>setSelectedTruck(t)} className="p-4 hover:bg-slate-800/50 cursor-pointer transition-colors flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded bg-slate-800 flex items-center justify-center font-bold text-white font-mono">{t.plate.substring(0,3)}</div>
+                                                    <div>
+                                                        <div className="font-bold text-white flex items-center gap-2">{t.plate} <span className="text-[10px] bg-slate-800 px-1 rounded text-slate-400">{t.carrier}</span></div>
+                                                        <div className="text-xs text-rose-400 font-bold mt-0.5 flex items-center gap-1">
+                                                            {t.status === 'DELAYED' ? `Delayed by ${getDelayDuration(t.eta)}` : `Urgent Priority`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <StatusBadge status={t.status} />
+                                                    <div className="text-[10px] text-slate-500 mt-1">{t.dockId ? `Dock ${activeDocks.find(d=>d.id===t.dockId)?.name}` : 'No Dock'}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Planned Arrivals (New Section) */}
+                                <div className="glass rounded-xl border border-slate-700 overflow-hidden">
+                                    <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                        <h3 className="font-bold text-white flex items-center gap-2"><Icon name="Calendar" size={18} className="text-indigo-500"/> Planned Arrivals</h3>
+                                        <button onClick={()=>handleStatClick('PLANNED')} className="text-xs text-blue-400 font-bold hover:text-blue-300">VIEW ALL</button>
+                                    </div>
+                                    <div className="divide-y divide-slate-800">
+                                        {plannedTrucks.length === 0 ? <div className="p-6 text-center text-slate-500 text-sm">No planned trucks coming up.</div> : 
+                                        plannedTrucks.map(t => (
+                                            <div key={t.id} onClick={()=>setSelectedTruck(t)} className="p-3 hover:bg-slate-800/50 cursor-pointer transition-colors flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-1 h-8 rounded-full bg-slate-600`}></div>
+                                                    <div>
+                                                        <div className="font-bold text-white text-sm">{t.plate} <span className="text-[10px] text-slate-500 font-normal ml-1">{t.carrier}</span></div>
+                                                        <div className="text-xs text-indigo-400 font-medium">ETA: {t.eta ? safeDate(t.eta).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'TBD'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <TypeIcon type={t.type}/>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Recent Arrivals */}
+                                <div className="glass rounded-xl border border-slate-700 overflow-hidden">
+                                    <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                        <h3 className="font-bold text-white flex items-center gap-2"><Icon name="Truck" size={18} className="text-blue-500"/> Recent Arrivals</h3>
+                                        <button onClick={()=>handleStatClick('ALL')} className="text-xs text-blue-400 font-bold hover:text-blue-300">VIEW ALL</button>
+                                    </div>
+                                    <div className="divide-y divide-slate-800">
+                                        {sortedTrucks.filter(t=>t.status==='ARRIVED' || t.status==='WAITING').slice(0, 5).map(t => (
+                                            <div key={t.id} onClick={()=>setSelectedTruck(t)} className="p-3 hover:bg-slate-800/50 cursor-pointer transition-colors flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-2 h-10 rounded-full ${t.type==='INBOUND'?'bg-emerald-500':'bg-blue-500'}`}></div>
+                                                    <div>
+                                                        <div className="font-bold text-white text-sm">{t.plate}</div>
+                                                        <div className="text-xs text-slate-500">{t.carrier}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-white font-mono text-sm">{getDuration(t.actualArrival)}</div>
+                                                    <div className="text-[10px] text-slate-500">Wait Time</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {sortedTrucks.filter(t=>t.status==='ARRIVED' || t.status==='WAITING').length === 0 && <div className="p-6 text-center text-slate-500 text-sm">No trucks currently waiting.</div>}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Col: Dock Overview */}
+                            <div className="glass rounded-xl border border-slate-700 overflow-hidden flex flex-col h-full max-h-[600px]">
+                                <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                                    <h3 className="font-bold text-white flex items-center gap-2"><Icon name="Anchor" size={18} className="text-emerald-500"/> Dock Overview</h3>
+                                    <button onClick={()=>setTab('DOCKS')} className="text-xs text-blue-400 font-bold hover:text-blue-300">MAP</button>
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-2 space-y-2 custom-scrollbar">
+                                    {dashboardDocks.map(d => {
+                                        const truck = activeTrucks.find(t => t.dockId === d.id && !t.hidden && t.status !== 'CANCELLED');
+                                        return (
+                                            <div key={d.id} onClick={()=>handleDockClick(d)} className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors ${d.status==='FREE' && !truck ? 'border-emerald-900/50 bg-emerald-950/10' : 'border-slate-800 bg-slate-900/30'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded flex items-center justify-center font-bold text-xs ${d.status==='FREE' && !truck ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>{d.name.replace('Dock ','')}</div>
+                                                    <div>
+                                                        <div className="font-bold text-white text-sm">{d.name}</div>
+                                                        <div className="text-[10px] text-slate-500 uppercase">{d.type}</div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    {truck ? <div className="text-right"><div className="text-white font-mono text-xs font-bold">{truck.plate}</div><StatusBadge status={truck.status}/></div> : 
+                                                     d.status !== 'FREE' ? <StatusBadge status={d.status} /> : <div className="text-xs font-bold text-emerald-500">OPEN</div>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
+                    {/* Sidebar */}
+                    <aside className="hidden lg:flex w-64 bg-slate-950 border-r border-slate-800 flex-col z-50">
+                        <div className="h-16 flex items-center px-6 border-b border-slate-800">
+                            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-900/20"><Icon name="Activity" size={20} /></div>
+                            <span className="ml-3 font-bold text-white text-lg tracking-tight">FlowCommand</span>
+                        </div>
+                        <nav className="flex-1 p-3 space-y-2 mt-4">
+                            {[ { id:'DASHBOARD', i:'Layout', l:'Dashboard' }, { id:'FLEET', i:'Truck', l:'Fleet Control' }, { id:'DOCKS', i:'Anchor', l:'Dock Map' }, { id:'USERS', i:'Users', l:'Team' }, { id:'SETTINGS', i:'Settings', l:'Settings' } ].map(n => (
+                                <button key={n.id} onClick={()=>setTab(n.id)} className={`w-full flex items-center p-3 rounded-xl transition-all ${tab===n.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 font-bold' : 'text-slate-400 hover:bg-slate-900 hover:text-white font-medium'}`}>
+                                    <Icon name={n.i} size={20}/><span className="ml-3">{n.l}</span>
+                                </button>
+                            ))}
+                        </nav>
+                        {/* Profile Section - Updated with onClick */}
+                        <div className="p-4 border-t border-slate-800">
+                            <div 
+                                onClick={() => setTab('SETTINGS')}
+                                className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer group"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 group-hover:border-blue-500 transition-colors flex items-center justify-center overflow-hidden">
+                                    {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <span className="font-bold text-slate-400">{user.name.charAt(0)}</span>}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-white truncate group-hover:text-blue-400 transition-colors">{user.name}</div>
+                                    <div className="text-xs text-slate-500 truncate">{user.role}</div>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); onLogout(); }} className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Logout">
+                                    <Icon name="LogOut" size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Mobile Bottom Nav */}
+                    <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around z-40 pb-safe px-2">
+                         {[ { id:'DASHBOARD', i:'Layout', l:'Home' }, { id:'FLEET', i:'Truck', l:'Fleet' }, { id:'DOCKS', i:'Anchor', l:'Docks' }, { id:'SETTINGS', i:'Settings', l:'More' } ].map(n => (
+                            <button key={n.id} onClick={()=>setTab(n.id)} className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${tab===n.id ? 'text-blue-400' : 'text-slate-500'}`}>
+                                <div className={`p-1.5 rounded-xl mb-1 ${tab===n.id ? 'bg-blue-900/20' : ''}`}><Icon name={n.i} size={24}/></div>
+                                <span className="text-[10px] font-bold">{n.l}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
+                        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-4 md:px-8 bg-slate-950/80 backdrop-blur z-20 shrink-0">
+                            <div className="lg:hidden flex items-center gap-2">
+                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white"><Icon name="Activity" size={18} /></div>
+                                <span className="font-bold text-white tracking-tight">FlowCommand</span>
+                            </div>
+                            <div className="hidden lg:block text-xs font-bold text-slate-500 uppercase tracking-widest">{tab.replace('_', ' ')}</div>
+                            <div className="flex items-center gap-4">
+                                <Clock />
+                                <button onClick={handleRefresh} className={`p-2.5 text-slate-400 hover:text-white bg-slate-900 rounded-lg border border-slate-800 transition-all active:scale-95 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}><Icon name="RefreshCw" size={18}/></button>
+                                <button onClick={handleRegisterOpen} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-blue-900/20 flex items-center gap-2"><Icon name="Plus" size={16}/> <span className="hidden md:inline">New Arrival</span></button>
+                            </div>
+                        </header>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth pb-24 md:pb-8 relative">
+                            {renderContent()}
+                        </div>
+                        
+                        {/* Toast Notification */}
+                        {refreshToast && (
+                            <div className="absolute top-20 right-8 bg-emerald-900/80 border border-emerald-500/30 text-emerald-100 px-4 py-2 rounded-lg shadow-xl backdrop-blur animate-fade-in flex items-center gap-2 z-50">
+                                <Icon name="CheckCircle" size={16} className="text-emerald-400"/> {refreshToast}
+                            </div>
+                        )}
+                        {registrationSuccess && (
+                            <div className="absolute top-20 right-8 bg-emerald-900/80 border border-emerald-500/30 text-emerald-100 px-4 py-3 rounded-lg shadow-xl backdrop-blur animate-fade-in flex items-center gap-2 z-50 max-w-sm">
+                                <Icon name="CheckCircle" size={20} className="text-emerald-400 shrink-0"/> 
+                                <div>
+                                    <div className="font-bold">Success</div>
+                                    <div className="text-xs opacity-90">{registrationSuccess}</div>
+                                </div>
+                                <button onClick={()=>setRegistrationSuccess(null)} className="ml-2 hover:bg-emerald-800 rounded p-1"><Icon name="X" size={14}/></button>
+                            </div>
+                        )}
+
+                        {/* Modals */}
+                        {renderArrivalModal()}
+                        {renderTruckModal()}
+                        {renderDockModal()}
+                        {renderEditModal()}
+                        {renderDockSelectorModal()}
+                        {userModalOpen && <UserModal user={editingUser} onClose={()=>setUserModalOpen(false)} onSave={()=>{setUserModalOpen(false); loadUsers();}} />}
+                        {confirmModal && <ConfirmationModal {...confirmModal} onCancel={()=>setConfirmModal(null)} />}
+                        {alertModal && <AlertModal {...alertModal} onClose={()=>setAlertModal(null)} />}
+                        {showDockConfigModal && <DockStatusConfigModal status={dockForm.status} onConfirm={handleDockConfigConfirm} onCancel={()=>{setShowDockConfigModal(false); setShowDockModal(true);}} />}
+                        {showCancellationModal && <CancellationModal onConfirm={handleCancellationConfirm} onCancel={()=>setShowCancellationModal(false)} />}
+                    </main>
+                </div>
+            );
+        };
+
+        const App = () => {
+             const [user, setUser] = useState(null);
+             const [loading, setLoading] = useState(true);
+
+             useEffect(() => {
+                 api.checkSession().then(u => {
+                     if(u) setUser(u);
+                     setLoading(false);
+                 });
+             }, []);
+
+             const handleUpdateUser = (updated) => { setUser(updated); };
+
+             if (loading) return (
+                <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 gap-6">
+                    <span className="spinner"></span>
+                    <div className="font-mono text-xs text-slate-500 tracking-[0.2em] animate-pulse">INITIALIZING SYSTEM...</div>
+                </div>
+             );
+
+             if (!user) return <LoginScreen onLogin={setUser} />;
+
+             return <Dashboard user={user} onLogout={async ()=>{await api.logout(); setUser(null);}} onUpdateUser={handleUpdateUser} />;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
